@@ -45,7 +45,7 @@ const float TIMESLICE = 1.0f;
 const float GRAVITY = -0.2f;
 #define PI 3.141592653589793
 #define ALPHA 1
-const int MAX_BULLETS = 11;
+const int MAX_BULLETS = 500;
 const Flt MINIMUM_ASTEROID_SIZE = 60.0;
 
 //-----------------------------------------------------------------------------
@@ -60,6 +60,7 @@ class Global {
 public:
 	int xres, yres;
 	char keys[65536];
+	
 	Global() {
 		xres = 1250;
 		yres = 900;
@@ -125,6 +126,7 @@ public:
 	struct timespec bulletTimer;
 	struct timespec mouseThrustTimer;
 	bool mouseThrustOn;
+	int kills;
 public:
 	Game() {
 		ahead = NULL;
@@ -132,6 +134,7 @@ public:
 		nasteroids = 0;
 		nbullets = 0;
 		mouseThrustOn = false;
+		kills=0;
 		//build 10 asteroids...
 		for (int j=0; j<10; j++) {
 			Asteroid *a = new Asteroid;
@@ -150,9 +153,9 @@ public:
 			a->pos[2] = 0.0f;
 			a->angle = 0.0;
 			a->rotate = rnd() * 4.0 - 2.0;
-			a->color[0] = 0.8;
-			a->color[1] = 0.8;
-			a->color[2] = 0.7;
+			for(int i=0;i<3;i++){
+			    a->color[i]=rnd();
+			}
 			a->vel[0] = (Flt)(rnd()*2.0-1.0);
 			a->vel[1] = (Flt)(rnd()*2.0-1.0);
 			//std::cout << "asteroid" << std::endl;
@@ -380,10 +383,13 @@ void check_mouse(XEvent *e)
 					//convert angle to a vector
 					Flt xdir = cos(rad);
 					Flt ydir = sin(rad);
-					b->pos[0] += xdir*20.0f;
-					b->pos[1] += ydir*20.0f;
-					b->vel[0] += xdir*6.0f + rnd()*0.1;
-					b->vel[1] += ydir*6.0f + rnd()*0.1;
+					Flt offset = 20.0f;
+					Flt velocity = 10.0f;
+					Flt vel_mod = 0.1f;
+					b->pos[0] += xdir*offset;
+					b->pos[1] += ydir*offset;
+					b->vel[0] += xdir*velocity + rnd()*vel_mod;
+					b->vel[1] += ydir*velocity + rnd()*vel_mod;
 					b->color[0] = 1.0f;
 					b->color[1] = 1.0f;
 					b->color[2] = 1.0f;
@@ -508,8 +514,8 @@ void buildAsteroidFragment(Asteroid *ta, Asteroid *a)
 {
 	//build ta from a
 	ta->nverts = 8;
-	ta->radius = a->radius / 2.0;
-	Flt r2 = ta->radius / 2.0;
+	ta->radius = a->radius / 1.2;
+	Flt r2 = ta->radius / 2;
 	Flt angle = 0.0f;
 	Flt inc = (PI * 2.0) / (Flt)ta->nverts;
 	for (int i=0; i<ta->nverts; i++) {
@@ -522,11 +528,11 @@ void buildAsteroidFragment(Asteroid *ta, Asteroid *a)
 	ta->pos[2] = 0.0f;
 	ta->angle = 0.0;
 	ta->rotate = a->rotate + (rnd() * 4.0 - 2.0);
-	ta->color[0] = 0.8;
-	ta->color[1] = 0.8;
-	ta->color[2] = 0.7;
-	ta->vel[0] = a->vel[0] + (rnd()*2.0-1.0);
-	ta->vel[1] = a->vel[1] + (rnd()*2.0-1.0);
+	for(int i=0;i<3;i++){
+	    ta->color[i]=rnd();
+	}
+	ta->vel[0] = a->vel[0] + (rnd()*10.0-5.0);
+	ta->vel[1] = a->vel[1] + (rnd()*10.0-5.0);
 }
 
 void physics()
@@ -649,6 +655,7 @@ void physics()
 					deleteAsteroid(&g, a);
 					a = savea;
 					g.nasteroids--;
+					g.kills++;
 				}
 				//delete the bullet...
 				memcpy(&g.barr[i], &g.barr[g.nbullets-1], sizeof(Bullet));
@@ -697,7 +704,8 @@ void physics()
 		struct timespec bt;
 		clock_gettime(CLOCK_REALTIME, &bt);
 		double ts = timeDiff(&g.bulletTimer, &bt);
-		if (ts > 0.1) {
+		Flt firing_delay=0;
+		if (ts > firing_delay) {
 			timeCopy(&g.bulletTimer, &bt);
 			if (g.nbullets < MAX_BULLETS) {
 				//shoot a bullet...
@@ -745,7 +753,7 @@ void render()
 	ggprint8b(&r, 16, 0x00ff0000, "3350 - Asteroids");
 	ggprint8b(&r, 16, 0x00ffff00, "n bullets: %i", g.nbullets);
 	ggprint8b(&r, 16, 0x00ffff00, "n asteroids: %i", g.nasteroids);
-	ggprint8b(&r, 16, 0x00ffff00, "n asteroids destroyed: ");
+	ggprint8b(&r, 16, 0x00ffff00, "n asteroids destroyed: %i", g.kills);
 	//
 	//-------------
 	//Draw the ship
@@ -793,10 +801,17 @@ void render()
 		Asteroid *a = g.ahead;
 		while (a) {
 			//Log("draw asteroid...\n");
-			glColor3fv(a->color);
 			glPushMatrix();
 			glTranslatef(a->pos[0], a->pos[1], a->pos[2]);
 			glRotatef(a->angle, 0.0f, 0.0f, 1.0f);
+			glColor3fv(a->color);
+			glBegin(GL_TRIANGLE_FAN);
+				//Log("%i verts\n",a->nverts);
+				for (int j=0; j<a->nverts; j++) {
+					glVertex2f(a->vert[j][0], a->vert[j][1]);
+				}
+			glEnd();
+			glColor3f(1.0f, 1.0f, 1.0f);
 			glBegin(GL_LINE_LOOP);
 				//Log("%i verts\n",a->nverts);
 				for (int j=0; j<a->nverts; j++) {
@@ -804,7 +819,7 @@ void render()
 				}
 			glEnd();
 			glPopMatrix();
-			glColor3f(1.0f, 0.0f, 0.0f);
+			//glColor3f(1.0f, 0.0f, 0.0f);
 			glBegin(GL_POINTS);
 				glVertex2f(a->pos[0], a->pos[1]);
 			glEnd();
