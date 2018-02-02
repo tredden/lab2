@@ -514,7 +514,7 @@ void buildAsteroidFragment(Asteroid *ta, Asteroid *a)
 {
 	//build ta from a
 	ta->nverts = 8;
-	ta->radius = a->radius / 1.2;
+	ta->radius = a->radius / 1.5;
 	Flt r2 = ta->radius / 2;
 	Flt angle = 0.0f;
 	Flt inc = (PI * 2.0) / (Flt)ta->nverts;
@@ -704,12 +704,10 @@ void physics()
 		struct timespec bt;
 		clock_gettime(CLOCK_REALTIME, &bt);
 		double ts = timeDiff(&g.bulletTimer, &bt);
-		Flt firing_delay=0;
+		Flt firing_delay=0.1;
 		if (ts > firing_delay) {
 			timeCopy(&g.bulletTimer, &bt);
 			if (g.nbullets < MAX_BULLETS) {
-				//shoot a bullet...
-				//Bullet *b = new Bullet;
 				Bullet *b = &g.barr[g.nbullets];
 				timeCopy(&b->time, &bt);
 				b->pos[0] = g.ship.pos[0];
@@ -721,14 +719,17 @@ void physics()
 				//convert angle to a vector
 				Flt xdir = cos(rad);
 				Flt ydir = sin(rad);
-				b->pos[0] += xdir*20.0f;
-				b->pos[1] += ydir*20.0f;
-				b->vel[0] += xdir*6.0f + rnd()*0.1;
-				b->vel[1] += ydir*6.0f + rnd()*0.1;
+				Flt offset = 20.0f;
+				Flt velocity = 10.0f;
+				Flt vel_mod = 0.1f;
+				b->pos[0] += xdir*offset;
+				b->pos[1] += ydir*offset;
+				b->vel[0] += xdir*velocity + rnd()*vel_mod;
+				b->vel[1] += ydir*velocity + rnd()*vel_mod;
 				b->color[0] = 1.0f;
 				b->color[1] = 1.0f;
 				b->color[2] = 1.0f;
-				g.nbullets++;
+				++g.nbullets;
 			}
 		}
 	}
